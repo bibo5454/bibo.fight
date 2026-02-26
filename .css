@@ -1,0 +1,13 @@
+/* الأمر اللي بيقلب اللعبة بالعرض إجباري */
+@media screen and (orientation: portrait) {
+  canvas {
+    transform: rotate(-90deg);
+    transform-origin: left top;
+    width: 100vh;
+    height: 100vw;
+    overflow: hidden;
+    position: absolute;
+    top: 100%;
+    left: 0;
+  }
+}
