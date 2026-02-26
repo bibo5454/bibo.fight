@@ -17,9 +17,27 @@
             margin: 0; background: var(--bg); overflow: hidden;
             font-family: 'Segoe UI', sans-serif; color: white;
             touch-action: none; user-select: none; -webkit-user-select: none;
+            width: 100vw; height: 100vh;
         }
 
-        canvas { display: block; }
+        /* --- أمر قلب الشاشة إجباري على جميع الهواتف --- */
+        #game-wrapper {
+            width: 100%; height: 100%; position: relative;
+        }
+
+        @media screen and (orientation: portrait) {
+            #game-wrapper {
+                transform: rotate(90deg);
+                transform-origin: left top;
+                width: 100vh;
+                height: 100vw;
+                position: absolute;
+                top: 0;
+                left: 100%;
+            }
+        }
+
+        canvas { display: block; width: 100%; height: 100%; }
 
         /* واجهة المستخدم (HUD) */
         #ui {
@@ -40,10 +58,10 @@
 
         #hearts { font-size: 26px; color: var(--pink); text-shadow: 0 0 10px var(--pink); }
 
-        /* --- 2. CONTROLS (تعديل Bibo للأزرار) --- */
+        /* --- 2. CONTROLS --- */
         #mobile-controls {
             position: absolute; bottom: 35px; left: 0; width: 100%;
-            display: flex; justify-content: space-between; padding: 0 20px;
+            display: flex; justify-content: space-between; padding: 0 40px;
             box-sizing: border-box; z-index: 1000;
         }
 
@@ -57,9 +75,7 @@
             box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
         }
 
-        /* الأسهم باصة في اتجاه الحركة */
         #btn-l { transform: rotate(180deg); } 
-        #btn-r { } 
 
         .btn:active {
             background: rgba(0, 242, 255, 0.3);
@@ -71,7 +87,6 @@
             background: rgba(255, 65, 108, 0.2);
         }
 
-        /* شاشة النهاية باسم Bibo */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); display: none;
@@ -94,77 +109,73 @@
 </head>
 <body>
 
-<div id="ui">
-    <div class="stat-panel">
-        <span class="label">SCORE</span>
-        <span id="score-text" class="val">0</span>
-        <span class="label">LEVEL</span>
-        <span id="level-text" class="val">1</span>
-        <div id="bibo-tag">Created by: BIBO</div>
+<div id="game-wrapper">
+    <div id="ui">
+        <div class="stat-panel">
+            <span class="label">SCORE</span>
+            <span id="score-text" class="val">0</span>
+            <span class="label">LEVEL</span>
+            <span id="level-text" class="val">1</span>
+            <div id="bibo-tag">Created by: BIBO</div>
+        </div>
+        <div id="hearts">♥♥♥</div>
     </div>
-    <div id="hearts">♥♥♥</div>
-</div>
 
-<div id="line"></div>
+    <div id="line"></div>
 
-<div id="overlay">
-    <h1 style="color: var(--pink); font-size: 45px; margin: 0;">MISSION FAILED</h1>
-    <p style="color: var(--gold); letter-spacing: 2px;">Created by BIBO, WE LOST THE BASE</p>
-    <div class="stat-panel" style="text-align: center; border: none; border-bottom: 3px solid var(--cyan);">
-        <span class="label">FINAL SCORE</span>
-        <span id="final-score" class="val" style="font-size: 40px;">0</span>
+    <div id="overlay">
+        <h1 style="color: var(--pink); font-size: 45px; margin: 0;">MISSION FAILED</h1>
+        <p style="color: var(--gold); letter-spacing: 2px;">Created by BIBO, WE LOST THE BASE</p>
+        <div class="stat-panel" style="text-align: center; border: none; border-bottom: 3px solid var(--cyan);">
+            <span class="label">FINAL SCORE</span>
+            <span id="final-score" class="val" style="font-size: 40px;">0</span>
+        </div>
+        <button class="restart-btn" onclick="location.reload()">RE-DEPLOY</button>
     </div>
-    <button class="restart-btn" onclick="location.reload()">RE-DEPLOY</button>
-</div>
 
-<div id="mobile-controls">
-    <div class="move-group">
-        <div class="btn" id="btn-l">➤</div>
-        <div class="btn" id="btn-r">➤</div>
+    <div id="mobile-controls">
+        <div class="move-group">
+            <div class="btn" id="btn-l">➤</div>
+            <div class="btn" id="btn-r">➤</div>
+        </div>
+        <div class="btn" id="btn-fire">🔥</div>
     </div>
-    <div class="btn" id="btn-fire">🔥</div>
-</div>
 
-<canvas id="gameCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
+</div>
 
 <script>
-/**
- * --- GALAXY Created by: BIBO EDITION ---
- * المحرك الرئيسي للعبة
- */
-
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 let W, H, DEAD_ZONE;
 function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-    DEAD_ZONE = H - 180;
+    // تعديل لحساب الأبعاد في حالة الدوران
+    const rect = document.getElementById('game-wrapper').getBoundingClientRect();
+    W = canvas.width = rect.width;
+    H = canvas.height = rect.height;
+    DEAD_ZONE = H - 150; // تعديل بسيط للمكان في وضع العرض
     document.getElementById('line').style.top = DEAD_ZONE + "px";
+    if(player) { player.x = W/2; player.y = H-80; }
 }
 window.addEventListener('resize', resize);
-resize();
+window.addEventListener('orientationchange', resize);
 
-// --- متغيرات الحالة ---
 let score = 0, level = 1, lives = 3, running = true;
 let enemyDir = 1, frame = 0;
-let fireRate = 300; // سرعة الضرب (بالميلي ثانية)
+let fireRate = 300; 
 let lastFireTime = 0;
 
 const stars = [], pBullets = [], eBullets = [], enemies = [], sparks = [], drops = [];
 const keys = { l: false, r: false };
 
-// النجوم
-for(let i=0; i<100; i++) stars.push({x: Math.random()*W, y: Math.random()*H, s: Math.random()*2, v: Math.random()*2 + 0.5});
-
-// --- الكلاسات ---
+for(let i=0; i<100; i++) stars.push({x: Math.random()*2000, y: Math.random()*2000, s: Math.random()*2, v: Math.random()*2 + 0.5});
 
 class Ship {
     constructor() {
         this.w = 46; this.h = 40;
-        this.x = W / 2; this.y = H - 110;
-        this.speed = 9; this.shield = 0;
+        this.x = W / 2; this.y = H - 80;
+        this.speed = 10; this.shield = 0;
     }
     draw() {
         if(this.shield % 10 > 5) return;
@@ -173,7 +184,7 @@ class Ship {
         ctx.shadowBlur = 20; ctx.shadowColor = '#00f2ff';
         ctx.fillStyle = '#00f2ff';
         ctx.beginPath();
-        ctx.moveTo(0, -25); ctx.lineTo(-25, 15); ctx.lineTo(25, 15);
+        ctx.moveTo(0, -20); ctx.lineTo(-20, 15); ctx.lineTo(20, 15);
         ctx.fill();
         ctx.restore();
     }
@@ -194,12 +205,12 @@ class Ship {
 class Enemy {
     constructor(x, y, color, hasDrop) {
         this.x = x; this.y = y; this.color = color;
-        this.hasDrop = hasDrop; // هل العدو ده معاه هدية؟
+        this.hasDrop = hasDrop;
     }
     draw() {
         ctx.shadowBlur = 10; ctx.shadowColor = this.color;
         ctx.fillStyle = this.color;
-        if(this.hasDrop) { // تمييز العدو اللي معاه هدية
+        if(this.hasDrop) {
             ctx.strokeStyle = 'white'; ctx.lineWidth = 2;
             ctx.strokeRect(this.x - 17, this.y - 14, 34, 28);
         }
@@ -225,54 +236,39 @@ class PowerUp {
     update() { this.y += this.v; }
 }
 
-const player = new Ship();
+let player;
 
-// --- نظام المستويات التصاعدي (Bibo Logic) ---
 function initLevel() {
     enemies.length = 0;
-    let count = (level === 1) ? 10 : (level === 2) ? 20 : (level === 3) ? 25 : 25 + (level * 2);
-    
-    const cols = Math.min(count, Math.floor(W / 55) - 1);
-    const palette = ['#ff416c', '#00f2ff', '#ffae00', '#9b59b6'];
-
-    // نحدد عدوين عشوائيين معاهم هدايا
+    let count = (level === 1) ? 10 : (level === 2) ? 18 : 24; 
+    const cols = Math.floor(W / 60);
+    const palette = ['#ff416c', '#00f2ff', '#ffae00'];
     let dropIdx1 = Math.floor(Math.random() * count);
-    let dropIdx2 = Math.floor(Math.random() * count);
-
     for(let i=0; i < count; i++) {
         let r = Math.floor(i / cols);
         let c = i % cols;
-        enemies.push(new Enemy(c * 50 + 50, r * 45 + 80, palette[r % 4], (i === dropIdx1 || i === dropIdx2)));
+        enemies.push(new Enemy(c * 60 + 50, r * 45 + 70, palette[r % 3], i === dropIdx1));
     }
 }
 
 function handleCollisions() {
-    // رصاص اللاعب ضد الأعداء
     pBullets.forEach((b, bi) => {
         enemies.forEach((e, ei) => {
             if(Math.hypot(b.x - e.x, b.y - e.y) < 22) {
-                // انفجار
                 for(let i=0; i<8; i++) sparks.push({x: e.x, y: e.y, color: e.color, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, a: 1});
-                
-                // لو العدو معاه هدية، نزلها
                 if(e.hasDrop) drops.push(new PowerUp(e.x, e.y));
-                
                 enemies.splice(ei, 1); pBullets.splice(bi, 1);
                 score += 100;
             }
         });
     });
-
-    // التقاط الهدايا
     drops.forEach((d, di) => {
         if(Math.hypot(d.x - player.x, d.y - player.y) < 30) {
             drops.splice(di, 1);
-            fireRate = Math.max(100, fireRate - 50); // تسريع الضرب
+            fireRate = 150; // هدية بيبو: ضرب سريع جداً
             score += 500;
         }
     });
-
-    // رصاص الأعداء ضد اللاعب
     eBullets.forEach((eb, ebi) => {
         if(Math.hypot(eb.x - player.x, eb.y - player.y) < 22) {
             eBullets.splice(ebi, 1);
@@ -294,38 +290,28 @@ function update() {
     if(!running) return;
     frame++;
     ctx.fillStyle = '#010105'; ctx.fillRect(0, 0, W, H);
-
-    // النجوم
     ctx.fillStyle = 'white';
     stars.forEach(s => { ctx.fillRect(s.x, s.y, s.s, s.s); s.y += s.v; if(s.y > H) s.y = 0; });
 
     player.update(); player.draw();
 
-    // حركة الجيش
     let hitEdge = false;
-    let speed = (2.5 + (level * 0.2)) * enemyDir;
+    let speed = (2.5 + (level * 0.3)) * enemyDir;
     enemies.forEach(e => {
         e.x += speed;
-        if(e.x > W - 20 || e.x < 20) hitEdge = true;
-        if(Math.random() < 0.0006 * level) eBullets.push({x: e.x, y: e.y, vy: 5});
+        if(e.x > W - 25 || e.x < 25) hitEdge = true;
+        if(Math.random() < 0.001 * level) eBullets.push({x: e.x, y: e.y, vy: 5});
     });
 
     if(hitEdge) {
         enemyDir *= -1;
-        enemies.forEach(e => {
-            e.y += 25;
-            if(e.y >= DEAD_ZONE) endGame();
-        });
+        enemies.forEach(e => { e.y += 20; if(e.y >= DEAD_ZONE) endGame(); });
     }
 
     enemies.forEach(e => e.draw());
-
-    // تحديث كل شيء (رصاص، هدايا، انفجارات)
     pBullets.forEach((b, i) => { b.y += b.v; ctx.fillStyle = '#00f2ff'; ctx.fillRect(b.x-2, b.y, 4, 15); if(b.y < 0) pBullets.splice(i, 1); });
     eBullets.forEach((b, i) => { b.y += b.vy; ctx.fillStyle = '#ff416c'; ctx.fillRect(b.x-2, b.y, 4, 15); if(b.y > H) eBullets.splice(i, 1); });
-    
     drops.forEach((d, i) => { d.update(); d.draw(); if(d.y > H) drops.splice(i, 1); });
-    
     sparks.forEach((p, i) => {
         p.x += p.vx; p.y += p.vy; p.a -= 0.02;
         ctx.globalAlpha = p.a; ctx.fillStyle = p.color;
@@ -334,7 +320,6 @@ function update() {
     });
 
     handleCollisions();
-
     if(enemies.length === 0) { level++; initLevel(); }
 
     document.getElementById('score-text').innerText = score;
@@ -344,39 +329,28 @@ function update() {
     requestAnimationFrame(update);
 }
 
-// --- تحكم الموبايل ---
 function setupControls() {
     const l = document.getElementById('btn-l'), r = document.getElementById('btn-r'), f = document.getElementById('btn-fire');
     const bind = (el, key) => {
         el.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[key] = true; });
         el.addEventListener('pointerup', (e) => { e.preventDefault(); keys[key] = false; });
-        el.addEventListener('pointerleave', (e) => { e.preventDefault(); keys[key] = false; });
     };
     bind(l, 'l'); bind(r, 'r');
     f.addEventListener('pointerdown', (e) => { e.preventDefault(); if(running) player.shoot(); });
 }
-// --- أمر تشغيل الكيبورد للكمبيوتر ---
+
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        keys.l = true; // تحرك يسار
-    }
-    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        keys.r = true; // تحرك يمين
-    }
-    if (e.key === ' ' || e.key === 'Enter') {
-        if(running) player.shoot(); // ضرب نار بالمسطرة
-    }
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.l = true;
+    if (e.key === 'ArrowRight' || e.key === 'd') keys.r = true;
+    if (e.key === ' ') if(running) player.shoot();
 });
-
 window.addEventListener('keyup', (e) => {
-    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        keys.l = false;
-    }
-    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        keys.r = false;
-    }
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.l = false;
+    if (e.key === 'ArrowRight' || e.key === 'd') keys.r = false;
 });
 
+resize();
+player = new Ship();
 initLevel(); setupControls(); update();
 </script>
 </body>
